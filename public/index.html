@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FareGrid</title>
+  <meta name="description" content="All-pairs cheapest travel costs between cities using the Floyd–Warshall algorithm (AOA Mini Project, Sr. 17).">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230C1226'/%3E%3Cpath d='M9 22 L16 9 L23 20' stroke='%23FFB547' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='22' r='3' fill='%2334E3C5'/%3E%3Ccircle cx='16' cy='9' r='3' fill='%239B87FF'/%3E%3Ccircle cx='23' cy='20' r='3' fill='%2334E3C5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('fw-theme'); } catch (e) {}
+      if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
+</head>
+<body>
+  <div class="bg-layer" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="glow g1"></div>
+    <div class="glow g2"></div>
+    <div class="glow g3"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="/" id="homeLink" aria-label="FareGrid home">
+      <svg class="brand-logo" viewBox="0 0 40 40" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="var(--teal)"/>
+            <stop offset="1" stop-color="var(--amber)"/>
+          </linearGradient>
+        </defs>
+        <rect x="1" y="1" width="38" height="38" rx="12" class="brand-bg"/>
+        <path class="brand-road" d="M10 28 C14 18, 18 12, 20 11 S27 20, 30 26" stroke="url(#lg)"/>
+        <circle cx="10" cy="28" r="3.6" fill="var(--teal)"/>
+        <circle cx="20" cy="11" r="3.6" fill="var(--violet)"/>
+        <circle cx="30" cy="26" r="3.6" fill="var(--amber)"/>
+      </svg>
+      <span class="brand-title">FareGrid</span>
+    </a>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab is-active" role="tab" data-view="network" aria-selected="true">
+        <span class="tab-num">1</span><span class="tab-label">Network</span>
+      </button>
+      <button class="tab" role="tab" data-view="visualize" aria-selected="false">
+        <span class="tab-num">2</span><span class="tab-label">Visualize</span>
+      </button>
+      <button class="tab" role="tab" data-view="routes" aria-selected="false">
+        <span class="tab-num">3</span><span class="tab-label">Route planner</span>
+      </button>
+      <button class="tab" role="tab" data-view="insights" aria-selected="false">
+        <span class="tab-num">4</span><span class="tab-label">Insights</span>
+      </button>
+      <span class="tab-indicator" aria-hidden="true"></span>
+    </nav>
+
+    <div class="top-actions">
+      <span class="engine-badge" id="engineBadge" title="Floyd–Warshall runs in C (floyd_core.c) compiled to WebAssembly">
+        <span class="dot"></span><span class="engine-text">Loading engine…</span>
+      </span>
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle colour theme">
+        <svg class="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============================ NETWORK ============================ -->
+    <section class="view is-active" id="view-network" data-view="network">
+      <div class="hero">
+        <div class="hero-text reveal">
+          <span class="eyebrow">AOA Mini Project · Sr. 17 · Dynamic Programming</span>
+          <h1>Find the cheapest trip between <span class="grad">every pair of cities</span>.</h1>
+          <p>Build a road network, watch Floyd–Warshall improve every route one intermediate city at a time, then plan any trip in an instant.</p>
+        </div>
+        <div class="presets reveal" id="presets"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card reveal">
+          <div class="card-head">
+            <h2>Network map</h2>
+            <div class="legend">
+              <span><i class="lg-line"></i>Road</span>
+              <span><i class="lg-line neg"></i>Negative cost</span>
+            </div>
+          </div>
+          <div class="graph-wrap">
+            <svg id="netGraph" class="graph" viewBox="0 0 640 460" role="img" aria-label="Network map"></svg>
+            <div class="graph-empty" id="netEmpty">Add cities or load a sample to see the map</div>
+            <div class="graph-hint">Drag cities to rearrange</div>
+          </div>
+        </div>
+
+        <div class="card reveal">
+          <div class="card-head">
+            <h2>Cities &amp; road costs</h2>
+            <span class="muted small">Row = from · Column = to · Empty = no road</span>
+          </div>
+          <form id="addCityForm" class="add-city" autocomplete="off">
+            <input id="cityInput" class="input" placeholder="Add a city, e.g. Kolhapur" maxlength="29" aria-label="City name">
+            <button class="btn btn-soft" type="submit">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add
+            </button>
+          </form>
+          <div class="chips" id="cityChips"></div>
+          <div class="matrix-scroll">
+            <table class="matrix editable" id="costTable"></table>
+          </div>
+          <p class="hint-row">Type <kbd>∞</kbd>, <kbd>x</kbd> or leave blank for no road · Negative values model discounts · Arrow keys move between cells</p>
+        </div>
+      </div>
+
+      <div class="action-bar reveal">
+        <div class="summary" id="netSummary"></div>
+        <div class="action-buttons">
+          <button class="btn btn-ghost" id="clearBtn" type="button">Clear</button>
+          <button class="btn btn-primary btn-lg" id="runBtn" type="button">
+            <span class="btn-label">Run Floyd–Warshall</span>
+            <svg class="arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================== VISUALIZE =========================== -->
+    <section class="view" id="view-visualize" data-view="visualize" hidden>
+      <div class="stage-strip-wrap card">
+        <div class="stage-strip" id="stageStrip"></div>
+      </div>
+
+      <div class="grid-2 vis-grid">
+        <div class="card">
+          <div class="card-head">
+            <h2 id="visTitle">Initial matrix</h2>
+            <div class="legend">
+              <span><i class="lg-dot violet"></i>Intermediate k</span>
+              <span><i class="lg-dot amber"></i>Compared</span>
+              <span><i class="lg-dot teal"></i>Improved</span>
+            </div>
+          </div>
+          <div class="graph-wrap">
+            <svg id="visGraph" class="graph" viewBox="0 0 640 460" role="img" aria-label="Algorithm visualisation"></svg>
+          </div>
+          <div class="narration" id="narration" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2 id="matTitle">D<sup>(0)</sup></h2>
+            <span class="pill" id="updCounter"></span>
+          </div>
+          <div class="matrix-scroll">
+            <table class="matrix" id="visTable"></table>
+          </div>
+          <div class="log-head">Improvements in this stage</div>
+          <ol class="log" id="eventLog"></ol>
+        </div>
+      </div>
+
+      <div class="player card" id="player">
+        <div class="player-buttons">
+          <button class="icon-btn" data-act="first" aria-label="Go to start"><svg viewBox="0 0 24 24"><path d="M6 5v14M18 6l-8 6 8 6z"/></svg></button>
+          <button class="icon-btn" data-act="prev" aria-label="Step back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <button class="play-btn" data-act="play" aria-label="Play">
+            <svg class="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></svg>
+            <svg class="i-pause" viewBox="0 0 24 24"><path d="M8 5h3v14H8zM13 5h3v14h-3z"/></svg>
+          </button>
+          <button class="icon-btn" data-act="next" aria-label="Step forward"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button class="icon-btn" data-act="last" aria-label="Go to end"><svg viewBox="0 0 24 24"><path d="M18 5v14M6 6l8 6-8 6z"/></svg></button>
+        </div>
+        <div class="scrubber">
+          <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Timeline">
+          <div class="scrub-meta"><span id="scrubLabel">Step 0</span><span class="muted">Space play · ← → step</span></div>
+        </div>
+        <div class="player-opts">
+          <div class="seg" id="stepMode" role="group" aria-label="Step size">
+            <button class="is-on" data-mode="update">Updates</button>
+            <button data-mode="stage">Stages</button>
+          </div>
+          <div class="seg" id="speedSeg" role="group" aria-label="Speed">
+            <button data-speed="0.5">0.5×</button>
+            <button class="is-on" data-speed="1">1×</button>
+            <button data-speed="2">2×</button>
+            <button data-speed="4">4×</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= ROUTE PLANNER ========================= -->
+    <section class="view" id="view-routes" data-view="routes" hidden>
+      <div class="grid-routes">
+        <div class="card query-card">
+          <div class="card-head"><h2>Plan a trip</h2></div>
+          <div class="od">
+            <label class="field">
+              <span>From</span>
+              <select id="srcSel" class="input select"></select>
+            </label>
+            <button class="swap" id="swapBtn" type="button" aria-label="Swap source and destination">
+              <svg viewBox="0 0 24 24"><path d="M7 4v16M7 4L3.5 7.5M7 4l3.5 3.5M17 20V4M17 20l-3.5-3.5M17 20l3.5-3.5"/></svg>
+            </button>
+            <label class="field">
+              <span>To</span>
+              <select id="dstSel" class="input select"></select>
+            </label>
+          </div>
+          <div class="result" id="routeResult"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Route on map</h2>
+            <div class="legend">
+              <span><i class="lg-dot teal"></i>Cheapest route</span>
+            </div>
+          </div>
+          <div class="graph-wrap">
+            <svg id="routeGraph" class="graph" viewBox="0 0 640 460" role="img" aria-label="Route map"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>All-pairs cheapest costs</h2>
+          <span class="muted small">Click any cell to plan that trip</span>
+        </div>
+        <div class="matrix-scroll">
+          <table class="matrix heat" id="finalTable"></table>
+        </div>
+        <div class="heat-legend">
+          <span>Cheaper</span><i class="heat-bar"></i><span>Costlier</span>
+          <span class="sep"></span><i class="sw inf"></i><span>Unreachable</span>
+          <i class="sw ninf"></i><span>−∞ (negative cycle)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================== INSIGHTS ============================ -->
+    <section class="view" id="view-insights" data-view="insights" hidden>
+      <div class="stats" id="statTiles"></div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h2>Improvements per stage</h2><span class="muted small">Routes made cheaper by each intermediate city</span></div>
+          <div class="bars" id="stageBars"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Negative cycle check</h2><span class="muted small">dist[i][i] after the final stage</span></div>
+          <div id="cycleReport"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h2>Unreachable pairs</h2></div>
+          <div id="unreachList"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>How it works</h2></div>
+          <div class="theory">
+            <div class="formula">
+              D<sup>(k)</sup>[i][j] = min( D<sup>(k−1)</sup>[i][j], D<sup>(k−1)</sup>[i][k] + D<sup>(k−1)</sup>[k][j] )
+            </div>
+            <ul class="theory-list">
+              <li><b>Subproblem.</b> D<sup>(k)</sup>[i][j] is the cheapest cost from i to j using only cities 1…k as stops in between.</li>
+              <li><b>Base case.</b> D<sup>(0)</sup> is the direct road cost matrix, 0 on the diagonal and ∞ where there is no road.</li>
+              <li><b>Route recovery.</b> A next-hop matrix stores the first city to visit, so any route can be rebuilt by following it.</li>
+              <li><b>Negative cycle.</b> If any D[i][i] &lt; 0 at the end, some costs fall without limit and have no cheapest value.</li>
+            </ul>
+            <div class="complexity">
+              <div><span>Time</span><b>Θ(n³)</b></div>
+              <div><span>Space</span><b>Θ(n²)</b></div>
+              <div><span>Engine</span><b>C</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Next-hop matrix</h2><span class="muted small">First city to visit from row city towards column city</span></div>
+        <div class="matrix-scroll">
+          <table class="matrix" id="nextTable"></table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Analysis &amp; Design of Algorithms · Mini Project Sr. 17 · FareGrid: Intercity All-Pairs Travel Cost Analyzer
+  </footer>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
